@@ -27,7 +27,13 @@ jobs:
           node-version: "24"
 
       - run: npm ci
-      - run: npm test
+      - name: Execute Unified Unit and Integration Tests
+        env:
+          NODE_ENV: test
+          PORT: 3003
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          TEST_MONGODB_URI: ${{ secrets.TEST_MONGODB_URI }}
+        run: npm test
 
   build:
     runs-on: ubuntu-latest

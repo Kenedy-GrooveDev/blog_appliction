@@ -32,7 +32,7 @@ test('invalid user is not created', async () => {
   }
 
   const results = await api
-    .post('/api/user/')
+    .post('/api/users/')
     .send(invalidUser)
     .expect(400)
     .expect('Content-Type', /application\/json/)

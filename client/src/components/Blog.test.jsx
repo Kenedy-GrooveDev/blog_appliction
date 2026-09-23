@@ -1,79 +1,111 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import Blog from './Blog'
-import BlogForm from './BlogForm'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi } from 'vitest'
+import Blog from '../pages/Blog'
+import BlogForm from './BlogForm'
 
-test('renders title and author', () => {
-  const blog = {
-    title: 'Component testing is done with react-testing-library',
-    author: 'Kenedy',
-    url: 'https://example.com',
-    likes: 5,
-    user: {
-      username: 'kenedy_dev',
-      name: 'Kenedy'
-    }
+const mockBlogId = '69ca37cc1a2b3c4d5e6f7g8h'
+
+const blogData = {
+  id: mockBlogId,
+  title: 'Component testing is done with react-testing-library',
+  author: 'Kenedy',
+  url: 'https://example.com',
+  likes: 5,
+  user: {
+    id: 'creator_id_123',
+    username: 'kenedy_dev',
+    name: 'Kenedy'
   }
+}
 
-  render(<Blog blog={blog} />)
+const renderBlogComponent = (props = {}) => {
+  return render(
+    <MemoryRouter initialEntries={[`/blogs/${mockBlogId}`]}>
+      <Routes>
+        <Route
+          path="/blogs/:id"
+          element={
+            <Blog
+              blogs={[blogData]}
+              removeBlog={vi.fn()}
+              handleLike={vi.fn()}
+              {...props}
+            />
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  )
+}
 
-  const element = screen.getByText('Component testing is done with react-testing-library Kenedy')
-  expect(element).toBeDefined()
+test('Blog information and likes are displayed to unauthenticated users, buttons are not displayed', () => {
+  renderBlogComponent({ loggedInUser: null })
+
+  expect(screen.getByText('Kenedy: Component testing is done with react-testing-library')).toBeDefined()
+  expect(screen.getByText('https://example.com')).toBeDefined()
+  expect(screen.getByText(/likes:? 5/i)).toBeDefined()
+
+  expect(screen.queryByText('like')).toBeNull()
+  expect(screen.queryByText('remove')).toBeNull()
 })
 
-test('checks that the blogs URL and number of likes are shown when the view button has been clicked', async () => {
-  const blog = {
-    title: 'Component testing is done with react-testing-library',
-    author: 'Kenedy',
-    url: 'https://example.com',
-    likes: 5,
-    user: {
-      username: 'kenedy_dev',
-      name: 'Kenedy'
-    }
+test('Authenticated users who are not the creator are shown only the like button', () => {
+  const outsiderUser = {
+    id: 'outsider_id_456',
+    username: 'someone_else',
+    name: 'Some Body'
   }
 
-  render(<Blog blog={blog} />)
+  renderBlogComponent({ loggedInUser: outsiderUser })
 
-  const initialUrl = screen.queryByText('https://example.com')
-  const initialLikes = screen.queryByText(/likes: 5/)
-  expect(initialUrl).toBeNull()
-  expect(initialLikes).toBeNull()
+  expect(screen.getByText('like')).toBeDefined()
+  expect(screen.queryByText('remove')).toBeNull()
+})
 
-  const user = userEvent.setup()
-  const button = screen.getByText('view')
-  await user.click(button)
+test('The blog creator is shown both the like button and the delete button', () => {
+  const creatorUser = {
+    id: 'creator_id_123',
+    username: 'kenedy_dev',
+    name: 'Kenedy'
+  }
 
-  const urlElement = screen.getByText('https://example.com')
-  const likesElement = screen.getByText(/likes: 5/)
+  renderBlogComponent({ loggedInUser: creatorUser })
 
-  expect(urlElement).toBeDefined()
-  expect(likesElement).toBeDefined()
+  expect(screen.getByText('like')).toBeDefined()
+  expect(screen.getByText('remove')).toBeDefined()
 })
 
 test('clicking the like button twice calls the event handler twice', async () => {
-  const blog = {
-    title: 'Component testing handles mock event spies',
-    author: 'Kenedy',
-    url: 'https://example.com',
-    likes: 5,
-    user: {
-      username: 'kenedy_dev',
-      name: 'Kenedy'
-    }
+  const mockHandler = vi.fn()
+  const outsiderUser = {
+    id: 'outsider_id_456',
+    username: 'someone_else',
+    name: 'Some Body'
   }
 
-  const mockHandler = vi.fn()
-
-  render(<Blog blog={blog} handleLike={mockHandler} />)
+  render(
+    <MemoryRouter initialEntries={[`/blogs/${mockBlogId}`]}>
+      <Routes>
+        <Route
+          path="/blogs/:id"
+          element={
+            <Blog
+              blogs={[blogData]}
+              removeBlog={vi.fn()}
+              handleLike={mockHandler}
+              loggedInUser={outsiderUser}
+            />
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  )
 
   const user = userEvent.setup()
-
-  const viewButton = screen.getByText('view')
-  await user.click(viewButton)
-
   const likeButton = screen.getByText('like')
+
   await user.click(likeButton)
   await user.click(likeButton)
 

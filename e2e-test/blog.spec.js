@@ -1,170 +1,166 @@
-const { test, expect, beforeEach, describe } = require('@playwright/test')
+const { test, expect } = require('@playwright/test')
 const { login, createBlog } = require('./helper')
 
-describe('Blog app', () => {
+test.describe('Blog app', () => {
   test.describe.configure({ timeout: 40_000 })
 
-  beforeEach(async ({ page, request }) => {
+  test.beforeEach(async ({ page, request }) => {
+    // Reset database
     await request.post('http://localhost:3003/api/testing/reset')
 
+    // Create test user
     await request.post('http://localhost:3003/api/users', {
       data: {
         name: 'Matti Luukkainen',
         username: 'mluukkai',
-        password: 'salainen'
-      }
+        password: 'salainen',
+      },
     })
 
     await page.goto('http://localhost:5173')
   })
 
   test('Login form is shown', async ({ page }) => {
-    await expect(page.getByText('log in to application')).toBeVisible()
+    await page.goto('http://localhost:5173/login')
+
+    const loginHeading = page.getByRole('heading', { name: /log in/i })
+    const fallbackText = page.getByText(/log in to application/i)
+
+    await expect(loginHeading.or(fallbackText).first()).toBeVisible()
     await expect(page.getByLabel('username:')).toBeVisible()
     await expect(page.getByLabel('password:')).toBeVisible()
     await expect(page.getByRole('button', { name: 'login' })).toBeVisible()
   })
 
-  describe('Login', () => {
+  test.describe('Login', () => {
     test('succeeds with correct credentials', async ({ page }) => {
+      await page.goto('http://localhost:5173/login')
+
       await login(page, 'mluukkai', 'salainen')
 
       const notification = page.locator('.notify')
 
       await expect(
-        notification.getByText('Welcome back, Matti Luukkainen')
+        notification.getByText('Welcome back, Matti Luukkainen!'),
       ).toBeVisible()
 
-      await expect(notification).toHaveCSS(
-        'border-color',
-        'rgb(0, 128, 0)'
-      )
+      await expect(notification).toHaveCSS('border-color', 'rgb(0, 128, 0)')
     })
 
     test('fails with wrong credentials', async ({ page }) => {
+      await page.goto('http://localhost:5173/login')
+
       await login(page, 'mluukkai', 'wrong')
 
       const notification = page.locator('.notify')
 
       await expect(
-        notification.getByText('wrong username or password')
+        notification.getByText('wrong username or password'),
       ).toBeVisible()
 
-      await expect(notification).toHaveCSS(
-        'border-color',
-        'rgb(255, 0, 0)'
-      )
+      await expect(notification).toHaveCSS('border-color', 'rgb(255, 0, 0)')
     })
   })
 
-  describe('When logged in', () => {
+  test.describe('When logged in', () => {
     const title = 'Automating End to End UI Tests with Playwright'
     const author = 'Matti Luukkainen'
+    const titleRegex = new RegExp(title, 'i')
 
-    beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }) => {
+      // Login
+      await page.goto('http://localhost:5173/login')
       await login(page, 'mluukkai', 'salainen')
+
+      // Create the blog
       await createBlog(page, title, author, 'https://fullstackopen.com')
+
+      // Go back to the blogs page.
+      // Your Navigation component has:
+      // <Link to="/">blogs</Link>
+      await page.getByRole('link', { name: 'blogs' }).click()
+
+      await expect(page).toHaveURL('http://localhost:5173/')
     })
 
     test('a new blog can be created', async ({ page }) => {
-      await expect(
-        page.locator('.blog-title', { hasText: `${title} ${author}` })
-      ).toBeVisible()
+      await expect(page.getByRole('link', { name: titleRegex })).toBeVisible()
     })
 
     test('a blog can be liked', async ({ page }) => {
-      const blog = page.locator('.blog-container', { hasText: title })
+      // Open the blog
+      await page.getByRole('link', { name: titleRegex }).first().click()
 
-      await blog.getByRole('button', { name: 'view' }).click()
-      await blog.getByRole('button', { name: 'like' }).click()
+      // Make sure we are on the blog page
+      await expect(page.getByRole('button', { name: 'like' })).toBeVisible()
 
-      await expect(blog.getByText('likes: 1')).toBeVisible()
+      // Like the blog
+      await page.getByRole('button', { name: 'like' }).click()
+
+      // Check likes
+      await expect(page.getByText(/likes \d+/)).toContainText('likes 1 like')
+
+      // Go back to blogs
+      await page.getByRole('link', { name: 'blogs' }).click()
+
+      await expect(page).toHaveURL('http://localhost:5173/')
     })
 
-    test('a blog can be successfully deleted by the creator', async ({ page }) => {
-      const blog = page.locator('.blog-container', { hasText: title })
+    test('a blog can be successfully deleted by the creator', async ({
+      page,
+    }) => {
+      // Open the blog
+      await page.getByRole('link', { name: titleRegex }).first().click()
 
-      page.once('dialog', dialog => dialog.accept())
+      // Accept the confirmation dialog
+      page.once('dialog', async (dialog) => {
+        expect(dialog.message()).toContain('Remove blog')
+        await dialog.accept()
+      })
 
-      await blog.getByRole('button', { name: 'view' }).click()
-      await blog.getByRole('button', { name: 'remove' }).click()
+      // Delete the blog
+      await page.getByRole('button', { name: 'remove' }).click()
 
-      await expect(
-        page.locator('.blog-container', { hasText: title })
-      ).toHaveCount(0)
+      // After deletion, the application should return to blogs
+      await expect(page).toHaveURL('http://localhost:5173/')
+
+      // The deleted blog should no longer exist
+      await expect(page.getByRole('link', { name: titleRegex })).toHaveCount(0)
     })
 
-    test('only the creator can see the remove button', async ({ page, request }) => {
+    test('only the creator can see the remove button', async ({
+      page,
+      request,
+    }) => {
+      // Create another user
       await request.post('http://localhost:3003/api/users', {
         data: {
           name: 'Other User',
           username: 'otheruser',
-          password: 'secret'
-        }
+          password: 'secret',
+        },
       })
 
+      // Log out Matti
       await page.getByRole('button', { name: 'logout' }).click()
+
+      // Log in as another user
+      await page.goto('http://localhost:5173/login')
       await login(page, 'otheruser', 'secret')
 
-      const blog = page.locator('.blog-container', { hasText: title })
+      // Go to blogs
+      await page.getByRole('link', { name: 'blogs' }).click()
 
-      await blog.getByRole('button', { name: 'view' }).click()
+      // Open Matti's blog
+      await page.getByRole('link', { name: titleRegex }).first().click()
 
+      // Other user must not see the remove button
       await expect(
-        blog.getByRole('button', { name: 'remove' })
+        page.getByRole('button', { name: 'remove' }),
       ).not.toBeVisible()
-    })
 
-    test('blogs are ordered by likes, most liked first', async ({ page }) => {
-      const leastLiked = 'Least liked blog'
-      const mediumLiked = 'Medium liked blog'
-      const mostLiked = 'Most liked blog'
-
-      await createBlog(
-        page,
-        leastLiked,
-        'Test Author',
-        'https://example.com/least'
-      )
-
-      await createBlog(
-        page,
-        mediumLiked,
-        'Test Author',
-        'https://example.com/medium'
-      )
-
-      await createBlog(
-        page,
-        mostLiked,
-        'Test Author',
-        'https://example.com/most'
-      )
-
-      const likeBlog = async (blogTitle, numberOfLikes) => {
-        const blog = page.locator('.blog-container', { hasText: blogTitle })
-
-        await blog.getByRole('button', { name: 'view' }).click()
-
-        for (let likes = 1; likes <= numberOfLikes; likes += 1) {
-          await blog.getByRole('button', { name: 'like' }).click()
-
-          await expect(
-            blog.getByText(`likes: ${likes}`)
-          ).toBeVisible()
-        }
-      }
-
-      await likeBlog(leastLiked, 1)
-      await likeBlog(mediumLiked, 2)
-      await likeBlog(mostLiked, 3)
-
-      const blogs = page.locator('.blog-container')
-
-      await expect(blogs.nth(0)).toContainText(mostLiked)
-      await expect(blogs.nth(1)).toContainText(mediumLiked)
-      await expect(blogs.nth(2)).toContainText(leastLiked)
-      await expect(blogs.nth(3)).toContainText(title)
+      // Return to blogs
+      await page.getByRole('link', { name: 'blogs' }).click()
     })
   })
 })

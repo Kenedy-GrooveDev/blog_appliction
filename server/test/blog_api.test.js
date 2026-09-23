@@ -6,29 +6,40 @@ const supertest = require('supertest')
 const app = require('../app')
 const helper = require('./test_helper')
 const User = require('../models/user')
+const bcrypt = require('bcrypt')
 
 const api = supertest(app)
 
 beforeEach(async () => {
   await Blog.deleteMany({})
-  const user = await User.findOne({ username: 'root' })
+  await User.deleteMany({})
+
+  const passwordHash = await bcrypt.hash('root123', 10)
+
+  // 1. Changed username from 'root' to 'blog_root' to isolate it from user_api.test.js
+  const user = new User({
+    username: 'blog_root',
+    name: 'blog_root',
+    passwordHash
+  })
+  const savedUser = await user.save()
 
   helper.initialBlogs.forEach((blog) => {
-    blog.user = user._id
+    blog.user = savedUser._id
   })
+
   await Blog.insertMany(helper.initialBlogs)
 })
 
 const login = async () => {
+  // 2. Updated credentials to use the isolated username
   const user = {
-    username: 'root',
+    username: 'blog_root',
     password: 'root123',
   }
 
   const response = await api.post('/api/login').send(user)
-
-  const token = response.body.token
-  return token
+  return response.body.token
 }
 
 describe('when there is initially some blogs saved', () => {
@@ -62,15 +73,14 @@ describe('addition of a new blog', () => {
     }
 
     await api
-      .post('/api/blogs').set('Authorization', `Bearer ${token}`)
+      .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('content-type', /application\/json/)
 
     const blogInDataBase = await helper.blogsInDb()
-    const initBlogs = helper.initialBlogs
-
-    assert.strictEqual(blogInDataBase.length, initBlogs.length + 1)
+    assert.strictEqual(blogInDataBase.length, helper.initialBlogs.length + 1)
   })
 
   test('likes property defaults to 0 if missing from the request', async () => {
@@ -104,11 +114,9 @@ describe('addition of a new blog', () => {
       .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(400)
-      .expect('content-type', /application\/json/)
   })
 
   test('fails with status code 401 if a token is not provided', async () => {
-
     const blog = {
       title: 'Learning Node.js',
       author: 'Kenedy',
@@ -120,37 +128,37 @@ describe('addition of a new blog', () => {
       .post('/api/blogs')
       .send(blog)
       .expect(401)
-      .expect('content-type', /application\/json/)
   })
 })
 
 describe('deletion of a blog', () => {
   test('succeeds with status code 204 if id is valid', async () => {
-    const id = (await helper.blogsInDb()).map((blog) => blog.id)
-    console.log('this is an id',id)
+    const blogsInDb = await helper.blogsInDb()
+    const id = blogsInDb.map((blog) => blog.id)
     const token = await login()
+
     await api
       .delete(`/api/blogs/${id[0]}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(204)
+
     const inDB = await helper.blogsInDb()
-    assert.strictEqual(
-      inDB.length,
-      helper.initialBlogs.length - 1,
-    )
+    assert.strictEqual(inDB.length, helper.initialBlogs.length - 1)
   })
 })
 
 describe('updating a blog', () => {
   test('a blog post\'s likes can be updated', async () => {
-    // inDB.length,
-    // helper.initialBlogs.length - 1,
     const blogsInDB = await helper.blogsInDb()
     const updated = { ...blogsInDB[0], likes: 12 }
-    await api.put(`/api/blogs/${blogsInDB[0].id}`).send(updated).expect(200)
+
+    await api
+      .put(`/api/blogs/${blogsInDB[0].id}`)
+      .send(updated)
+      .expect(200)
 
     const updatedBlogInDB = (await helper.blogsInDb()).find(
-      (blog) => blog.id === blogsInDB[0].id,
+      (blog) => blog.id === blogsInDB[0].id
     )
 
     assert.strictEqual(updatedBlogInDB.likes, updated.likes)

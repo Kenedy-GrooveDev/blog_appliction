@@ -35,10 +35,15 @@ app.use(
     origin: 'http://localhost:5173/',
   }),
 )
+
+app.use(express.static('dist'))
+
 app.use(tokenExtractor)
 app.use('/api/blogs', blogRouter)
 app.use('/api/users', userRouter)
 app.use('/api/login', loginRouter)
+
+console.log('NODE_ENV:', process.env.NODE_ENV)
 
 if (process.env.NODE_ENV === 'test') {
   const testingRouter = require('./controllers/testing')

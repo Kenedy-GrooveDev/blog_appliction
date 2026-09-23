@@ -1,17 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 const Notification = ({ message, variant }) => {
   const [remove, setRemove] = useState(false)
 
-  useEffect(() => {
-    setRemove(false)
-
-    const time = setTimeout(() => {
-      setRemove(true)
-    }, 5000)
-
-    return () => clearTimeout(time)
-  }, [message])
 
   if (!message || remove) {
     return null
@@ -32,6 +23,7 @@ const Notification = ({ message, variant }) => {
       className='notify'
     >
       {message}
+      <button onClick={() => setRemove(true)}>X</button>
     </div>
   )
 }

@@ -5,13 +5,15 @@ const login = async (page, username, password) => {
 }
 
 const createBlog = async (page, title, author, url) => {
-  await page.getByRole('button', { name: 'create new blog' }).click()
+  // "new blog" is a Link in the Navigation component
+  await page.getByRole('link', { name: 'new blog' }).click()
+
   await page.getByLabel('title:').fill(title)
   await page.getByLabel('author:').fill(author)
   await page.getByLabel('url:').fill(url)
-  await page.getByRole('button', { name: 'create' }).click()
 
-  await page.locator('.blog-title', { hasText: title }).waitFor()
+  // "create" is the submit button inside the form
+  await page.getByRole('button', { name: 'create' }).click()
 }
 
 module.exports = { login, createBlog }

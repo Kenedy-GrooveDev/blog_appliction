@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  // ... your other config options (testDir, projects, etc.)
+  // 🎯 THE CRITICAL FIX: Forces Playwright to only search the e2e-test folder
+  testDir: './e2e-test',
 
   /* ⚙️ CRITICAL DATABASE CONTEXT FIXES */
   workers: 1, // Force tests to execute one at a time (sequential)

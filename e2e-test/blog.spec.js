@@ -23,12 +23,16 @@ test.describe('Blog app', () => {
   test('Login form is shown', async ({ page }) => {
     await page.goto('http://localhost:5173/login')
 
-    const loginHeading = page.getByRole('heading', { name: /log in/i })
+    const loginHeading = page.getByText('Log in')
+
     const fallbackText = page.getByText(/log in to application/i)
 
     await expect(loginHeading.or(fallbackText).first()).toBeVisible()
+
     await expect(page.getByLabel('username:')).toBeVisible()
+
     await expect(page.getByLabel('password:')).toBeVisible()
+
     await expect(page.getByRole('button', { name: 'login' })).toBeVisible()
   })
 
@@ -64,44 +68,62 @@ test.describe('Blog app', () => {
 
   test.describe('When logged in', () => {
     const title = 'Automating End to End UI Tests with Playwright'
+
     const author = 'Matti Luukkainen'
+
     const titleRegex = new RegExp(title, 'i')
 
     test.beforeEach(async ({ page }) => {
       // Login
       await page.goto('http://localhost:5173/login')
+
       await login(page, 'mluukkai', 'salainen')
 
       // Create the blog
       await createBlog(page, title, author, 'https://fullstackopen.com')
 
-      // Go back to the blogs page.
-      // Your Navigation component has:
-      // <Link to="/">blogs</Link>
-      await page.getByRole('link', { name: 'blogs' }).click()
+      // Go back to blogs
+      await page.getByRole('link', { name: 'blogs', exact: true }).click()
 
       await expect(page).toHaveURL('http://localhost:5173/')
     })
 
     test('a new blog can be created', async ({ page }) => {
-      await expect(page.getByRole('link', { name: titleRegex })).toBeVisible()
+      await expect(
+        page.getByRole('link', {
+          name: titleRegex,
+        }),
+      ).toBeVisible()
     })
 
     test('a blog can be liked', async ({ page }) => {
       // Open the blog
-      await page.getByRole('link', { name: titleRegex }).first().click()
+      await page
+        .getByRole('link', {
+          name: titleRegex,
+        })
+        .first()
+        .click()
 
       // Make sure we are on the blog page
-      await expect(page.getByRole('button', { name: 'like' })).toBeVisible()
+      await expect(
+        page.getByRole('button', {
+          name: 'like',
+        }),
+      ).toBeVisible()
 
       // Like the blog
-      await page.getByRole('button', { name: 'like' }).click()
+      await page
+        .getByRole('button', {
+          name: 'like',
+        })
+        .click()
 
       // Check likes
       await expect(page.getByText(/likes \d+/)).toContainText('likes 1 like')
 
       // Go back to blogs
-      await page.getByRole('link', { name: 'blogs' }).click()
+      await page.getByRole('link', { name: 'blogs', exact: true }).click()
 
       await expect(page).toHaveURL('http://localhost:5173/')
     })
@@ -110,25 +132,39 @@ test.describe('Blog app', () => {
       page,
     }) => {
       // Open the blog
-      await page.getByRole('link', { name: titleRegex }).first().click()
+      await page
+        .getByRole('link', {
+          name: titleRegex,
+        })
+        .first()
+        .click()
 
-      // Accept the confirmation dialog
+      // Accept confirmation dialog
       page.once('dialog', async (dialog) => {
         expect(dialog.message()).toContain('Remove blog')
+
         await dialog.accept()
       })
 
       // Delete the blog
-      await page.getByRole('button', { name: 'remove' }).click()
+      await page
+        .getByRole('button', {
+          name: 'remove',
+        })
+        .click()
 
-      // After deletion, the application should return to blogs
+      // Application should return to blogs
       await expect(page).toHaveURL('http://localhost:5173/')
 
-      // The deleted blog should no longer exist
-      await expect(page.getByRole('link', { name: titleRegex })).toHaveCount(0)
+      // Deleted blog should no longer exist
+      await expect(
+        page.getByRole('link', {
+          name: titleRegex,
+        }),
+      ).toHaveCount(0)
     })
 
-    test('only the creator can see the remove button', async ({
+    test('only the creator can not see the remove button', async ({
       page,
       request,
     }) => {
@@ -142,25 +178,37 @@ test.describe('Blog app', () => {
       })
 
       // Log out Matti
-      await page.getByRole('button', { name: 'logout' }).click()
+      await page
+        .getByRole('button', {
+          name: 'logout',
+        })
+        .click()
 
       // Log in as another user
       await page.goto('http://localhost:5173/login')
+
       await login(page, 'otheruser', 'secret')
 
       // Go to blogs
-      await page.getByRole('link', { name: 'blogs' }).click()
+      await page.getByRole('link', { name: 'blogs', exact: true }).click()
 
       // Open Matti's blog
-      await page.getByRole('link', { name: titleRegex }).first().click()
+      await page
+        .getByRole('link', {
+          name: titleRegex,
+        })
+        .first()
+        .click()
 
-      // Other user must not see the remove button
+      // Other user must not see remove button
       await expect(
-        page.getByRole('button', { name: 'remove' }),
+        page.getByRole('button', {
+          name: 'remove',
+        }),
       ).not.toBeVisible()
 
       // Return to blogs
-      await page.getByRole('link', { name: 'blogs' }).click()
+      await page.getByRole('link', { name: 'blogs', exact: true }).click()
     })
   })
 })

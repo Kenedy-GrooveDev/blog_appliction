@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi } from 'vitest'
 import Blog from '../pages/Blog'
-import BlogForm from './BlogForm'
+import BlogForm from '../pages/BlogForm'
 
 const mockBlogId = '69ca37cc1a2b3c4d5e6f7g8h'
 

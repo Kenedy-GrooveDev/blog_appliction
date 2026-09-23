@@ -1,10 +1,20 @@
+import { Box } from '@mui/material'
 import BlogList from '../components/BlogList'
+import Notification from '../components/Notification'
 
-const Home = ({ sortedBlogs }) => {
+const Home = ({
+  sortedBlogs,
+  notifyMessage,
+}) => {
   return (
-    <div>
-      <BlogList blogs={sortedBlogs}/>
-    </div>
+    <Box sx={{ mt: 2 }}>
+      <Notification
+        message={notifyMessage?.message}
+        variant={notifyMessage?.variant}
+      />
+
+      <BlogList blogs={sortedBlogs} />
+    </Box>
   )
 }
 

@@ -9,11 +9,12 @@ const cors = require('cors')
 const { unknownEndPoint, errorHandler, tokenExtractor } = require('./utils/middleware')
 
 const dns = require('node:dns')
+const healthRouter = require('./controllers/health')
 dns.setServers(['8.8.8.8', '1.1.1.1'])
 
 const app = express()
 
-logger.info('connecting to:', config.MONGODB_URI)
+logger.info('connecting...')
 
 mongoose.set('strictQuery', false)
 
@@ -42,6 +43,7 @@ app.use(tokenExtractor)
 app.use('/api/blogs', blogRouter)
 app.use('/api/users', userRouter)
 app.use('/api/login', loginRouter)
+app.use('/health', healthRouter)
 
 console.log('NODE_ENV:', process.env.NODE_ENV)
 

@@ -76,3 +76,100 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+  deploy:
+    needs: [lint, unit_tests, build, playwright]
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ', '), '#skip') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Trigger deployment
+        run: curl ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+  notify_failure:
+    needs: [lint, unit_tests, build, playwright, deploy]
+    if: >-
+      ${{
+        always() &&
+        github.event_name == 'push' &&
+        (
+          needs.lint.result == 'failure' ||
+          needs.unit_tests.result == 'failure' ||
+          needs.build.result == 'failure' ||
+          needs.playwright.result == 'failure' ||
+          needs.deploy.result == 'failure'
+        )
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Commit Message
+        id: git_info
+        run: |
+          MSG=$(git log -1 --pretty=format:"%s" "${{ github.sha }}")
+          echo "commit_msg=$MSG" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Discord Failure
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          status: failure
+          content: |
+            **❌ Build Failed!** The pipeline encountered an error
+          title: "Failure Details"
+          description: |
+            **Repository:** ${{ github.repository }}
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Message:** ${{ github.event.head_commit.message || steps.git_info.outputs.commit_msg }}
+            **Author:** ${{ github.actor }}
+            **Workflow:** ${{ github.workflow }}
+            **Job:** deployment_pipeline
+
+            [View Commit](<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>)
+            [View Workflow Run](<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>)
+
+  notify_success:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Notify Discord Success
+        if: ${{ success() && github.event_name == 'push' }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          status: success
+          content: |
+            **✅ Deployment Successful!** A new version deployed to production
+          title: "Deployment Details"
+          description: |
+            **Commit:** ${{ github.sha }}
+            **Message:** ${{ github.event.head_commit.message }}
+            **Author:** ${{ github.actor }}
+
+  tag_release:
+    needs: [deploy]
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ', '), '#skip') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: "0"
+
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: patch
+          TAG_PREFIX: v

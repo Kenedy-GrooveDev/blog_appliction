@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi } from 'vitest'
 import Blog from '../pages/Blog'
-import BlogForm from './BlogForm'
+import BlogForm from '../pages/BlogForm'
 
 const mockBlogId = '69ca37cc1a2b3c4d5e6f7g8h'
 
@@ -16,8 +16,8 @@ const blogData = {
   user: {
     id: 'creator_id_123',
     username: 'kenedy_dev',
-    name: 'Kenedy'
-  }
+    name: 'Kenedy',
+  },
 }
 
 const renderBlogComponent = (props = {}) => {
@@ -36,53 +36,83 @@ const renderBlogComponent = (props = {}) => {
           }
         />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 }
 
 test('Blog information and likes are displayed to unauthenticated users, buttons are not displayed', () => {
   renderBlogComponent({ loggedInUser: null })
 
-  expect(screen.getByText('Kenedy: Component testing is done with react-testing-library')).toBeDefined()
-  expect(screen.getByText('https://example.com')).toBeDefined()
-  expect(screen.getByText(/likes:? 5/i)).toBeDefined()
+  expect(
+    screen.getByText(
+      'Component testing is done with react-testing-library',
+    ),
+  ).toBeDefined()
 
-  expect(screen.queryByText('like')).toBeNull()
-  expect(screen.queryByText('remove')).toBeNull()
+  expect(
+    screen.getByText('by Kenedy'),
+  ).toBeDefined()
+
+  expect(
+    screen.getByText('https://example.com'),
+  ).toBeDefined()
+
+  expect(
+    screen.getByText(/likes:? 5/i),
+  ).toBeDefined()
+
+  expect(
+    screen.queryByRole('button', { name: 'like' }),
+  ).toBeNull()
+
+  expect(
+    screen.queryByRole('button', { name: 'remove' }),
+  ).toBeNull()
 })
 
 test('Authenticated users who are not the creator are shown only the like button', () => {
   const outsiderUser = {
     id: 'outsider_id_456',
     username: 'someone_else',
-    name: 'Some Body'
+    name: 'Some Body',
   }
 
   renderBlogComponent({ loggedInUser: outsiderUser })
 
-  expect(screen.getByText('like')).toBeDefined()
-  expect(screen.queryByText('remove')).toBeNull()
+  expect(
+    screen.getByRole('button', { name: 'like' }),
+  ).toBeDefined()
+
+  expect(
+    screen.queryByRole('button', { name: 'remove' }),
+  ).toBeNull()
 })
 
 test('The blog creator is shown both the like button and the delete button', () => {
   const creatorUser = {
     id: 'creator_id_123',
     username: 'kenedy_dev',
-    name: 'Kenedy'
+    name: 'Kenedy',
   }
 
   renderBlogComponent({ loggedInUser: creatorUser })
 
-  expect(screen.getByText('like')).toBeDefined()
-  expect(screen.getByText('remove')).toBeDefined()
+  expect(
+    screen.getByRole('button', { name: 'like' }),
+  ).toBeDefined()
+
+  expect(
+    screen.getByRole('button', { name: 'remove' }),
+  ).toBeDefined()
 })
 
 test('clicking the like button twice calls the event handler twice', async () => {
   const mockHandler = vi.fn()
+
   const outsiderUser = {
     id: 'outsider_id_456',
     username: 'someone_else',
-    name: 'Some Body'
+    name: 'Some Body',
   }
 
   render(
@@ -100,11 +130,14 @@ test('clicking the like button twice calls the event handler twice', async () =>
           }
         />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 
   const user = userEvent.setup()
-  const likeButton = screen.getByText('like')
+
+  const likeButton = screen.getByRole('button', {
+    name: 'like',
+  })
 
   await user.click(likeButton)
   await user.click(likeButton)
@@ -116,7 +149,7 @@ test('the form calls the event handler with the right details when a new blog is
   const newBlog = {
     title: 'Mastering Integration Testing in Full Stack Open',
     author: 'Kenedy',
-    url: 'https://example.com'
+    url: 'https://example.com',
   }
 
   const mockHandler = vi.fn()
@@ -124,10 +157,13 @@ test('the form calls the event handler with the right details when a new blog is
 
   render(<BlogForm createBlog={mockHandler} />)
 
-  const titleInput = screen.getByPlaceholderText('write title here')
-  const authorInput = screen.getByPlaceholderText('write author here')
-  const urlInput = screen.getByPlaceholderText('write url here')
-  const submitButton = screen.getByText('create')
+  const titleInput = screen.getByPlaceholderText('Enter blog title')
+  const authorInput = screen.getByPlaceholderText('Enter author name')
+  const urlInput = screen.getByPlaceholderText('https://example.com')
+
+  const submitButton = screen.getByRole('button', {
+    name: 'create',
+  })
 
   await user.type(titleInput, newBlog.title)
   await user.type(authorInput, newBlog.author)
@@ -136,7 +172,16 @@ test('the form calls the event handler with the right details when a new blog is
   await user.click(submitButton)
 
   expect(mockHandler.mock.calls).toHaveLength(1)
-  expect(mockHandler.mock.calls[0][0].title).toBe(newBlog.title)
-  expect(mockHandler.mock.calls[0][0].author).toBe(newBlog.author)
-  expect(mockHandler.mock.calls[0][0].url).toBe(newBlog.url)
+
+  expect(mockHandler.mock.calls[0][0].title).toBe(
+    newBlog.title,
+  )
+
+  expect(mockHandler.mock.calls[0][0].author).toBe(
+    newBlog.author,
+  )
+
+  expect(mockHandler.mock.calls[0][0].url).toBe(
+    newBlog.url,
+  )
 })
